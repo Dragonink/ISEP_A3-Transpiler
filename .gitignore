@@ -1,5 +1,9 @@
 # Output
 /out/
 
+# LaTeX artifacts
+/docs/*
+!/docs/*.tex
+
 # Visual Studio Code
 .vscode/

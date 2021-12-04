@@ -1,0 +1,85 @@
+\documentclass[a4paper,12pt,notitlepage,english]{article}
+\usepackage[hmargin=1.5cm,vmargin=2cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage[main=english]{babel}
+\usepackage{mathtools}
+\usepackage{listings}
+\usepackage[pdfusetitle]{hyperref}
+
+\lstset{		
+	basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\bfseries,
+  commentstyle=\itshape,
+  numberstyle=\tiny,
+  tabsize=2,
+  breaklines=true,
+	postbreak=\mbox{\textcolor{red}{\(\hookrightarrow\)}\space},
+	keepspaces=true,
+  showstringspaces=false,
+  numbers=left,
+  numbersep=5pt,
+  stepnumber=1,
+}
+
+\title{\textbf{PSBLM} Transpiler Lexical Analyser}
+\author{\textsc{Berthoud} Tanguy \and \textsc{Liard} François \and \textsc{Msekni} Sabri}
+
+\begin{document}
+	\maketitle
+
+	This work contains the \textbf{standalone} prototype of our lexical analyser, meaning that the program only recognizes some input text according to our grammar, which we had to change to accomodate the recursion issues with \emph{LEX}.
+
+	\section{Grammar changes}
+
+	We stumbled upon the recursion issues with \emph{LEX} when trying to implement our previously-defined grammar.
+	Thus we made the following changes:\begin{itemize}
+		\item added \(\verb+<value>+ \longrightarrow \verb+<ident>+ | \verb+<literal>+\)
+		\item modified \(\verb+<expr>+ \longrightarrow \verb+<value>+ | \verb+<unop>+\verb+<value>+ | \verb+<value>+\verb+<biop>+\verb+<value>+\)
+		\item modified \(\verb+<assign>+ \longrightarrow \verb+<ident>+ \text{ \bfseries := } \left(\verb+<expr>+ | \verb+<call>+\right)\)
+		\item added \(\verb+<blank>+ \longrightarrow \left[\verb+ +\backslash\text{t}\right]\)
+		\item modified \(\verb+<stmt>+ \longrightarrow \verb+<blank>+^* | \verb+<comment>+ | \verb+<declaration>+ | \verb+<assign>+ | \verb+<read>+ | \verb+<write>+\)
+		\item added \(\verb+<instr>+ \longrightarrow \verb+<stmt>+ | \verb+<if>+ | \verb+<while>+\)
+		\item modified \(\verb+<fn>+ \longrightarrow \text{\bfseries function } \verb+<ident>+\text{\bfseries (}\left(\verb+<ident>+\left(\text{\bfseries , } \verb+<ident>+\right)^*\right)?\text{\bfseries )}\text{\bfseries : } \verb+<type>+ \text{ \bfseries\emph{newline}}\\\indent\left(\verb+<instr>+ \text{ \bfseries\emph{newline}}\right)^*\\\indent\text{\bfseries return } \verb+<expr>+\)
+		\item modified \(\verb+<program>+ \longrightarrow \left(\left(\verb+<instr>+ | \verb+<fn>+\right)\text{\bfseries\emph{newline}}\right)^*\)
+	\end{itemize}
+
+	\noindent We also added some non-meaningful \(\verb+<blank>+^*\) in the code, and made the \verb+<expr>+ parameter in \verb+<write>+ optional.
+
+	\section{Testing our lexical analyser}
+
+	Our compiled lexical analyser asks an input either from \texttt{stdin} or by pipe.
+
+	It currently just prints the largest structure it recognizes.
+	This means that if an input is a lexically valid code, our analyser will print \verb+PROGRAM+.
+
+	\newpage\appendix\part*{Listings}
+
+	\section*{\emph{LEX} code}
+
+	\lstinputlisting[linerange={1-37}]{../src/lexa.l}
+	\newpage
+	\lstinputlisting[linerange={39-57},firstnumber=39]{../src/lexa.l}
+
+	\section*{Tests}
+
+	Our analyser recognizes all of the following tests as lexically valid programs.
+
+	\subsection*{Addition}
+
+	\lstinputlisting{../tests/addition.psblm}
+
+	\subsection*{If}
+
+	\lstinputlisting{../tests/if.psblm}
+
+	\subsection*{While}
+
+	\lstinputlisting{../tests/while.psblm}
+
+	\newpage\subsection*{Function}
+
+	\lstinputlisting{../tests/function.psblm}
+\end{document}
