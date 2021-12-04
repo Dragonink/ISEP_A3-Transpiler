@@ -1,0 +1,8 @@
+var age : integer
+read("How old are you ?", age)
+
+if age >= 18 then begin
+    write("You are an adult")
+end else begin
+    write("You are NOT an adult")
+end

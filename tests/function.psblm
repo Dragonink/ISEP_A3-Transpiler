@@ -1,0 +1,7 @@
+function double(a): integer
+    return 2 * a
+
+var a : integer
+read("A =", a)
+a := double(a)
+write("2A =", a)

@@ -1,0 +1,9 @@
+var max : integer
+read("Count until ?", max)
+
+var i : integer
+i := 0
+while i <= c do begin
+    write("", i)
+    i := i + 1
+end
