@@ -1,4 +1,6 @@
 # Output
+/src/lex.yy.*
+/src/y.*
 /out/
 
 # LaTeX artifacts

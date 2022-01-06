@@ -1,5 +1,11 @@
 %{
 #include <stdio.h>
+#include <string.h>
+#include "sym.h"
+#include "ast.h"
+#include "y.tab.h"
+
+SymType symtype_from_str(char*);
 %}
 
 blank [ \t]
@@ -37,21 +43,36 @@ call {ident}"("{blank}*({expr}(","{blank}*{expr})*)?{blank}*")"
 program ({blank}*({instr}|{fn}){blank}*\n)*
 
 %%
-{comment}	printf("COMMENT");
+","	return COMMA;
+":"	return COLON;
+"("	return LPAREN;
+")"	return RPAREN;
+"var"	return VAR;
 
-{declaration}	printf("DECLARATION");
-
-{value}	printf("VALUE");
-{expr}	printf("EXPRESSION");
-
-{assign}	printf("ASSIGN");
-{read}	printf("READ");
-{write}	printf("WRITE");
-{block} printf("BLOCK");
-{if} printf("IF BLOCK");
-{while} printf("WHILE BLOCK");
-
-{fn}	printf("FUNCTION");
-
-{program}	printf("PROGRAM");
+{comment}	return COMMENT;
+{type}	{
+	yylval.type = symtype_from_str(yytext);
+	return TYPE;
+};
+{ident}	{
+	char* yytextcpy = (char*) malloc(sizeof(yytext) + 1);
+	yylval.ident = strcpy(yytextcpy, yytext);
+	return IDENT;
+};
 %%
+
+SymType symtype_from_str(char* s) {
+	if (strcmp(s, "integer") == 0) {
+		return Integer;
+	} else if (strcmp(s, "real") == 0) {
+		return Real;
+	} else if (strcmp(s, "boolean") == 0) {
+		return Boolean;
+	} else if (strcmp(s, "char") == 0) {
+		return Char;
+	} else if (strcmp(s, "string") == 0) {
+		return String;
+	} else {
+		return _error;
+	}
+}
