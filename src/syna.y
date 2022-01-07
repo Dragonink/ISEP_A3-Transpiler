@@ -1,6 +1,5 @@
 %{
 #define SYMTABLE_SIZE 1024
-#define TMP_IDENTLIST_SIZE 256
 
 #include <stdio.h>
 #include <string.h>
@@ -16,14 +15,11 @@ Sym* curr_symtable;
 int curr_symtable_count;
 Sym* search_sym(char* name);
 Sym* add_sym(char* name, SymType type);
-Sym* scoped_symtable();
+Sym* scoped_symtable(void);
 
 AST* root;
 AST* new_ast(Token token, AST* l_op, AST* r_op);
 void free_ast(AST* ast);
-
-char* tmp_identlist[TMP_IDENTLIST_SIZE];
-int tmp_identlist_count;
 %}
 
 %union {
@@ -38,14 +34,21 @@ int tmp_identlist_count;
 %token LPAREN RPAREN
 %token VAR READ WRITE BEGINBLK ENDBLK IF THEN ELSE WHILE DO FUNCTION RETURN
 %token PLUS MINUS MULT REAL_DIV INT_DIV MOD
+%token UNPLUS UNMINUS
 %token EQ GT GE LT LE NE AND OR NOT ASSIGNEQ
+
+%left PLUS MINUS
+%left MULT REAL_DIV INT_DIV MOD
+%left AND OR
+%precedence UNPLUS UNMINUS NOT
+%precedence THEN
+%precedence ELSE
 
 %token COMMENT TYPE
 %token <ident> IDENT
 %token <literal> LITERAL
 
 %type <parse> expr identlist identlist_tail exprlist exprlist_tail stmtlist stmtlist_tail stmt function program_tail program_head program
-
 %start program
 
 %%
@@ -107,11 +110,11 @@ expr:
 		$$ = new_ast(BinOrOp, $1, $3);
 		if ($$ == NULL) YYNOMEM;
 	}
-	| PLUS expr {
+	| PLUS expr %prec UNPLUS {
 		$$ = new_ast(UnPlusOp, $2, NULL);
 		if ($$ == NULL) YYNOMEM;
 	}
-	| MINUS expr {
+	| MINUS expr %prec UNMINUS {
 		$$ = new_ast(UnMinusOp, $2, NULL);
 		if ($$ == NULL) YYNOMEM;
 	}
@@ -262,7 +265,7 @@ function: FUNCTION IDENT LPAREN {
 	$$->sym = add_sym($2, IdentSym);
 	$$->sym->scoped = curr_symtable;
 	if ($$->sym == NULL || $$->sym->scoped == NULL) YYNOMEM;
-	curr_symtable = (Sym*) &symtable;
+	curr_symtable = symtable;
 	curr_symtable_count = symtable_count;
 };
 
@@ -317,7 +320,7 @@ Sym* add_sym(char* name, SymType type) {
 		if (curr_symtable_count >= SYMTABLE_SIZE) {
 			return NULL;
 		} else {
-			sym = curr_symtable + curr_symtable_count++;
+			sym = curr_symtable + (curr_symtable_count++);
 			char* namecpy = (char*) malloc(sizeof(name) + 1);
 			sym->name = strcpy(namecpy, name);
 		}
@@ -325,7 +328,7 @@ Sym* add_sym(char* name, SymType type) {
 	sym->type = type;
 	return sym;
 }
-Sym* scoped_symtable() {
+Sym* scoped_symtable(void) {
 	return (Sym*) malloc(SYMTABLE_SIZE * sizeof(Sym));
 }
 
@@ -337,12 +340,8 @@ AST* new_ast(Token token, AST* l_op, AST* r_op) {
 	return newast;
 }
 void free_ast(AST* ast) {
-	if (ast->l_op != NULL) {
-		free_ast(ast->l_op);
-	}
-	if (ast->r_op != NULL) {
-		free_ast(ast->r_op);
-	}
+	if (ast->l_op != NULL) free_ast(ast->l_op);
+	if (ast->r_op != NULL) free_ast(ast->r_op);
 	free(ast);
 }
 
@@ -358,5 +357,7 @@ int main(void) {
 	yydebug = 1;
 #endif
 
+	curr_symtable = symtable;
+	curr_symtable_count = symtable_count;
 	return yyparse();
 }
