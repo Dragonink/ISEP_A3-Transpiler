@@ -1,6 +1,8 @@
 #ifndef _H_SYM
 #define _H_SYM
 
+#define SYMTABLE_SIZE 1024
+
 typedef enum type {
 	IdentSym,
 	LiteralSym,
@@ -9,7 +11,13 @@ typedef enum type {
 typedef struct sym {
 	char* name;
 	SymType type;
-	struct sym* scoped;
+	struct symtable* scoped;
 } Sym;
+
+typedef struct symtable {
+	Sym table[SYMTABLE_SIZE];
+	int len;
+	struct symtable* parent;
+} SymTable;
 
 #endif

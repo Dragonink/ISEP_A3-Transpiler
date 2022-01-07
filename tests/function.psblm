@@ -1,5 +1,6 @@
-function double(a): integer
+function double(a): integer begin
     return 2 * a
+end
 
 var a : integer
 read("A =", a)

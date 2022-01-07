@@ -1,18 +1,18 @@
 out :
 	mkdir out
 
-prebuild_YACC_OUT := $(addprefix src/y.tab,.c .h)
-$(prebuild_YACC_OUT) : src/syna.y | out
+src/ast.h : src/sym.h
+
+src/y.tab.c src/y.tab.h $(if $(DEBUG),src/y.output) : src/syna.y src/sym.h src/ast.h | out
 	bison $(if $(DEBUG),-tv) -o src/y.tab.c -d $<
 
-prebuild_LEX_OUT := src/lex.yy.c
-$(prebuild_LEX_OUT) : src/lexa.l src/y.tab.h | out
+src/lex.yy.c : src/lexa.l src/y.tab.h src/ast.h | out
 	flex $(if $(DEBUG),-d) -o $@ $<
 
-out/lexa : $(prebuild_LEX_OUT) | out
+out/lexa : src/lex.yy.c | out
 	gcc -lfl -o $@ $<
 
-out/syna : $(prebuild_YACC_OUT) $(prebuild_LEX_OUT) | out
+out/syna : src/y.tab.c src/lex.yy.c | out
 	gcc $(if $(DEBUG),-g) -o $@ $(filter-out %.h,$^)
 
 .DEFAULT_GOAL := out/syna

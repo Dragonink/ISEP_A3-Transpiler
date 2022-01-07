@@ -36,6 +36,8 @@ literal {number}|{bool}|{char}|{string}
 "else"	return ELSE;
 "while"	return WHILE;
 "do"	return DO;
+"function"	return FUNCTION;
+"return"	return RETURN;
 "+"	return PLUS;
 "-"	return MINUS;
 "*"	return MULT;

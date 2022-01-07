@@ -1,6 +1,4 @@
 %{
-#define SYMTABLE_SIZE 1024
-
 #include <stdio.h>
 #include <string.h>
 #include "sym.h"
@@ -9,13 +7,11 @@
 int yylex(void);
 void yyerror(const char*);
 
-Sym symtable[SYMTABLE_SIZE];
-int symtable_count;
-Sym* curr_symtable;
-int curr_symtable_count;
-Sym* search_sym(char* name);
+SymTable symtable;
+SymTable* curr_symtable;
+Sym* search_sym(char* name, SymTable* table, int search_parents);
 Sym* add_sym(char* name, SymType type);
-Sym* scoped_symtable(void);
+SymTable* scoped_symtable(void);
 
 AST* root;
 AST* new_ast(Token token, AST* l_op, AST* r_op);
@@ -125,7 +121,7 @@ expr:
 	| IDENT LPAREN exprlist RPAREN {
 		$$ = new_ast(FnCall, $3, NULL);
 		if ($$ == NULL) YYNOMEM;
-		$$->sym = search_sym($1);
+		$$->sym = search_sym($1, curr_symtable, 1);
 		if ($$->sym = NULL) {
 			yyerror("Undefined function");
 			YYERROR;
@@ -134,7 +130,7 @@ expr:
 	| IDENT {
 		$$ = new_ast(IdentToken, NULL, NULL);
 		if ($$ == NULL) YYNOMEM;
-		$$->sym = search_sym($1);
+		$$->sym = search_sym($1, curr_symtable, 1);
 		if ($$->sym == NULL) {
 			yyerror("Undeclared identifier");
 			YYERROR;
@@ -215,7 +211,7 @@ stmt:
 		AST* ident_ast = new_ast(IdentToken, NULL, NULL);
 		$$ = new_ast(Assign, ident_ast, $3);
 		if ($$ == NULL) YYNOMEM;
-		$$->sym = search_sym($1);
+		$$->sym = search_sym($1, curr_symtable, 1);
 		if ($$->sym == NULL) {
 			yyerror("Undeclared identifier");
 			YYERROR;
@@ -225,7 +221,7 @@ stmt:
 		AST* ident_ast = new_ast(IdentToken, NULL, NULL);
 		$$ = new_ast(Read, $3, ident_ast);
 		if ($$ == NULL) YYNOMEM;
-		$$->sym = search_sym($5);
+		$$->sym = search_sym($5, curr_symtable, 1);
 		if ($$->sym == NULL) {
 			yyerror("Undeclared identifier");
 			YYERROR;
@@ -249,6 +245,10 @@ stmt:
 		if ($$ == NULL) YYNOMEM;
 	}
 	| RETURN expr {
+		if (curr_symtable == &symtable) {
+			yyerror("Return statement outside function");
+			YYERROR;
+		}
 		$$ = new_ast(Return, $2, NULL);
 		if ($$ == NULL) YYNOMEM;
 	}
@@ -256,17 +256,14 @@ stmt:
 	| { $$ = NULL; };
 
 function: FUNCTION IDENT LPAREN {
-	symtable_count = curr_symtable_count;
 	curr_symtable = scoped_symtable();
-	curr_symtable_count = 0;
-} identlist RPAREN NEWLINE stmtlist {
-	$$ = new_ast(Function, $5, $8);
+} identlist RPAREN COLON TYPE stmtlist {
+	$$ = new_ast(Function, $5, $9);
 	if ($$ == NULL) YYNOMEM;
 	$$->sym = add_sym($2, IdentSym);
 	$$->sym->scoped = curr_symtable;
 	if ($$->sym == NULL || $$->sym->scoped == NULL) YYNOMEM;
-	curr_symtable = symtable;
-	curr_symtable_count = symtable_count;
+	curr_symtable = &symtable;
 };
 
 program_tail:
@@ -304,23 +301,32 @@ program: program_head {
 };
 %%
 
-Sym* search_sym(char* name) {
+Sym* search_sym(char* name, SymTable* table, int search_parents) {
 	int i;
-	for (i = curr_symtable_count - 1; i >= 0; i--) {
-		Sym* sym = curr_symtable + i;
+	for (i = table->len - 1; i >= 0; i--) {
+		Sym* sym = &table->table[i];
 		if (strcmp(sym->name, name) == 0) {
 			return sym;
 		}
 	}
-	return NULL;
+	if (search_parents && table->parent != NULL) {
+		return search_sym(name, table->parent, search_parents);
+	} else {
+		return NULL;
+	}
 }
 Sym* add_sym(char* name, SymType type) {
-	Sym* sym = search_sym(name);
+	Sym* sym;
+	if (type == LiteralSym) {
+		sym = search_sym(name, curr_symtable, 1);
+	} else {
+		sym = search_sym(name, curr_symtable, 0);
+	}
 	if (sym == NULL) {
-		if (curr_symtable_count >= SYMTABLE_SIZE) {
+		if (curr_symtable->len >= SYMTABLE_SIZE) {
 			return NULL;
 		} else {
-			sym = curr_symtable + (curr_symtable_count++);
+			sym = &curr_symtable->table[curr_symtable->len++];
 			char* namecpy = (char*) malloc(sizeof(name) + 1);
 			sym->name = strcpy(namecpy, name);
 		}
@@ -328,8 +334,8 @@ Sym* add_sym(char* name, SymType type) {
 	sym->type = type;
 	return sym;
 }
-Sym* scoped_symtable(void) {
-	return (Sym*) malloc(SYMTABLE_SIZE * sizeof(Sym));
+SymTable* scoped_symtable(void) {
+	return (SymTable*) malloc(sizeof(SymTable));
 }
 
 AST* new_ast(Token token, AST* l_op, AST* r_op) {
@@ -357,7 +363,6 @@ int main(void) {
 	yydebug = 1;
 #endif
 
-	curr_symtable = symtable;
-	curr_symtable_count = symtable_count;
+	curr_symtable = &symtable;
 	return yyparse();
 }
