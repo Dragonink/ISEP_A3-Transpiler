@@ -346,9 +346,11 @@ AST* new_ast(Token token, AST* l_op, AST* r_op) {
 	return newast;
 }
 void free_ast(AST* ast) {
-	if (ast->l_op != NULL) free_ast(ast->l_op);
-	if (ast->r_op != NULL) free_ast(ast->r_op);
-	free(ast);
+	if (ast != NULL) {
+		if (ast->l_op != NULL) free_ast(ast->l_op);
+		if (ast->r_op != NULL) free_ast(ast->r_op);
+		free(ast);
+	}
 }
 
 void yyerror(const char* s) {

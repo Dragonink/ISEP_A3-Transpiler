@@ -1,0 +1,13 @@
+var factor: integer
+factor := 10
+
+function divide(a, b): real begin
+    var factor: integer
+    factor := factor div 2
+    if a >= b then return factor * a / b else return factor * b / a
+end
+
+var a, b : real
+read("A =", a)
+read("B =", b)
+write(divide(a, b))

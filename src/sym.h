@@ -1,7 +1,7 @@
 #ifndef _H_SYM
 #define _H_SYM
 
-#define SYMTABLE_SIZE 1024
+#define SYMTABLE_SIZE 256
 
 typedef enum type {
 	IdentSym,
