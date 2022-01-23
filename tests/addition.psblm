@@ -1,4 +1,4 @@
 var a, b : integer
 read("A =", a)
 read("B =", b)
-write("A+B = ", a + b)
+write("A+B =", a + b)

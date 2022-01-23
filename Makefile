@@ -12,7 +12,11 @@ src/lex.yy.c : src/lexa.l src/y.tab.h src/ast.h | out
 out/lexa : src/lex.yy.c | out
 	gcc -lfl -o $@ $<
 
-out/syna : src/y.tab.c src/lex.yy.c | out
+out/psblmc : src/y.tab.c src/lex.yy.c src/ast.c | out
 	gcc $(if $(DEBUG),-g) -o $@ $(filter-out %.h,$^)
+.DEFAULT_GOAL := out/psblmc
 
-.DEFAULT_GOAL := out/syna
+tests/%.py : tests/%.psblm out/psblmc
+	out/psblmc $@ <$<
+tests : $(patsubst %.psblm,%.py,$(wildcard tests/*.psblm))
+.PHONY : tests

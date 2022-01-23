@@ -7,18 +7,20 @@
 int yylex(void);
 void yyerror(const char*);
 
-SymTable symtable;
-SymTable* curr_symtable;
-Sym* search_sym(char* name, SymTable* table, int search_parents);
-Sym* add_sym(char* name, SymType type);
+static SymTable symtable;
+static SymTable* curr_symtable;
+ValType get_valtype(const char* s);
+Sym* search_sym(const char* name, SymTable* table);
+Sym* add_sym(const char* name, SymType type);
 SymTable* scoped_symtable(void);
 
-AST* root;
+static AST* root;
 AST* new_ast(Token token, AST* l_op, AST* r_op);
 void free_ast(AST* ast);
 %}
 
 %union {
+	char* type;
 	char* ident;
 	char* literal;
 	AST* parse;
@@ -40,7 +42,8 @@ void free_ast(AST* ast);
 %precedence THEN
 %precedence ELSE
 
-%token COMMENT TYPE
+%token COMMENT 
+%token <type> TYPE
 %token <ident> IDENT
 %token <literal> LITERAL
 
@@ -121,8 +124,8 @@ expr:
 	| IDENT LPAREN exprlist RPAREN {
 		$$ = new_ast(FnCall, $3, NULL);
 		if ($$ == NULL) YYNOMEM;
-		$$->sym = search_sym($1, curr_symtable, 1);
-		if ($$->sym = NULL) {
+		$$->sym = search_sym($1, curr_symtable);
+		if ($$->sym == NULL) {
 			yyerror("Undefined function");
 			YYERROR;
 		}
@@ -130,7 +133,7 @@ expr:
 	| IDENT {
 		$$ = new_ast(IdentToken, NULL, NULL);
 		if ($$ == NULL) YYNOMEM;
-		$$->sym = search_sym($1, curr_symtable, 1);
+		$$->sym = search_sym($1, curr_symtable);
 		if ($$->sym == NULL) {
 			yyerror("Undeclared identifier");
 			YYERROR;
@@ -206,13 +209,21 @@ stmt:
 		AST* type_ast = new_ast(Type, NULL, NULL);
 		$$ = new_ast(Declaration, $2, type_ast);
 		if ($$ == NULL) YYNOMEM;
+		if ($2 != NULL) {
+			AST* ast = $2;
+			ValType valtype = get_valtype($4);
+			while (ast != NULL) {
+				ast->l_op->sym->valtype = valtype;
+				ast = ast->r_op;
+			}
+		}
 	}
 	| IDENT ASSIGNEQ expr {
 		AST* ident_ast = new_ast(IdentToken, NULL, NULL);
 		$$ = new_ast(Assign, ident_ast, $3);
 		if ($$ == NULL) YYNOMEM;
-		$$->sym = search_sym($1, curr_symtable, 1);
-		if ($$->sym == NULL) {
+		ident_ast->sym = search_sym($1, curr_symtable);
+		if (ident_ast->sym == NULL) {
 			yyerror("Undeclared identifier");
 			YYERROR;
 		}
@@ -221,8 +232,8 @@ stmt:
 		AST* ident_ast = new_ast(IdentToken, NULL, NULL);
 		$$ = new_ast(Read, $3, ident_ast);
 		if ($$ == NULL) YYNOMEM;
-		$$->sym = search_sym($5, curr_symtable, 1);
-		if ($$->sym == NULL) {
+		ident_ast->sym = search_sym($5, curr_symtable);
+		if (ident_ast->sym == NULL) {
 			yyerror("Undeclared identifier");
 			YYERROR;
 		}
@@ -260,10 +271,11 @@ function: FUNCTION IDENT LPAREN {
 } identlist RPAREN COLON TYPE stmtlist {
 	$$ = new_ast(Function, $5, $9);
 	if ($$ == NULL) YYNOMEM;
+	SymTable* ref_curr_symtable = curr_symtable;
+	curr_symtable = curr_symtable->parent;
 	$$->sym = add_sym($2, IdentSym);
-	$$->sym->scoped = curr_symtable;
+	$$->sym->scoped = ref_curr_symtable;
 	if ($$->sym == NULL || $$->sym->scoped == NULL) YYNOMEM;
-	curr_symtable = &symtable;
 };
 
 program_tail:
@@ -301,45 +313,49 @@ program: program_head {
 };
 %%
 
-Sym* search_sym(char* name, SymTable* table, int search_parents) {
-	int i;
-	for (i = table->len - 1; i >= 0; i--) {
+ValType get_valtype(const char* s) {
+	if (strcmp(s, "integer") == 0) return Integer;
+	else if (strcmp(s, "real") == 0) return Real;
+	else if (strcmp(s, "boolean") == 0) return Boolean;
+	else if (strcmp(s, "char") == 0) return Char;
+	else return String;
+}
+
+Sym* search_sym(const char* name, SymTable* table) {
+	for (int i = table->len - 1; i >= 0; i--) {
 		Sym* sym = &table->table[i];
 		if (strcmp(sym->name, name) == 0) {
 			return sym;
 		}
 	}
-	if (search_parents && table->parent != NULL) {
-		return search_sym(name, table->parent, search_parents);
+	if (table->parent != NULL) {
+		return search_sym(name, table->parent);
 	} else {
 		return NULL;
 	}
 }
-Sym* add_sym(char* name, SymType type) {
-	Sym* sym;
-	if (type == LiteralSym) {
-		sym = search_sym(name, curr_symtable, 1);
-	} else {
-		sym = search_sym(name, curr_symtable, 0);
-	}
+Sym* add_sym(const char* name, SymType symtype) {
+	Sym* sym = search_sym(name, curr_symtable);
 	if (sym == NULL) {
 		if (curr_symtable->len >= SYMTABLE_SIZE) {
 			return NULL;
 		} else {
 			sym = &curr_symtable->table[curr_symtable->len++];
-			char* namecpy = (char*) malloc(sizeof(name) + 1);
+			char* namecpy = malloc(strlen(name) + 1);
 			sym->name = strcpy(namecpy, name);
 		}
 	}
-	sym->type = type;
+	sym->symtype = symtype;
 	return sym;
 }
 SymTable* scoped_symtable(void) {
-	return (SymTable*) malloc(sizeof(SymTable));
+	SymTable* subtable = malloc(sizeof(SymTable));
+	subtable->parent = curr_symtable;
+	return subtable;
 }
 
 AST* new_ast(Token token, AST* l_op, AST* r_op) {
-	AST* newast = (AST*) malloc(sizeof(AST));
+	AST* newast = malloc(sizeof(AST));
 	newast->token = token;
 	newast->l_op = l_op;
 	newast->r_op = r_op;
@@ -359,12 +375,29 @@ void yyerror(const char* s) {
 int yywrap(void) {
 	return 1;
 }
-int main(void) {
+int main(int argc, char* argv[]) {
 #if YYDEBUG
 	extern int yydebug;
 	yydebug = 1;
 #endif
 
 	curr_symtable = &symtable;
-	return yyparse();
+	add_sym("abs", IdentSym);
+	add_sym("exp", IdentSym);
+	add_sym("log", IdentSym);
+	add_sym("pow", IdentSym);
+	add_sym("sqrt", IdentSym);
+	add_sym("floor", IdentSym);
+	add_sym("ceil", IdentSym);
+
+	int ret = yyparse();
+	if (ret > 0) return ret;
+	else {
+		char* py = "from math import exp, log, pow, sqrt, floor, ceil\n";
+		const char* transpiled = transpile(root, 0);
+		py = strconcat(py, transpiled);
+		FILE* f = fopen(argv[1], "w");
+		fputs(py, f);
+		fclose(f);
+	}
 }

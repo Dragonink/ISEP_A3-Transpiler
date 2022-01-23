@@ -48,4 +48,7 @@ typedef struct ast {
 	struct ast* r_op;
 } AST;
 
+char* strconcat(char* s1, const char* s2);
+char* transpile(AST* ast, unsigned int indent_lvl);
+
 #endif

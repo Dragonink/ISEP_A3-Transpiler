@@ -3,14 +3,23 @@
 
 #define SYMTABLE_SIZE 256
 
-typedef enum type {
+typedef enum symtype {
 	IdentSym,
 	LiteralSym,
 } SymType;
 
+typedef enum valtype {
+	Integer,
+	Real,
+	Boolean,
+	Char,
+	String,
+} ValType;
+
 typedef struct sym {
 	char* name;
-	SymType type;
+	SymType symtype;
+	ValType valtype;
 	struct symtable* scoped;
 } Sym;
 

@@ -1,6 +1,7 @@
 # Output
 /src/lex.yy.*
 /src/y.*
+/tests/*.py
 /out/
 
 # LaTeX artifacts

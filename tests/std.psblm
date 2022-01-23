@@ -1,0 +1,3 @@
+var a : real
+read("A =", a)
+write("exp(A) =", exp(a))

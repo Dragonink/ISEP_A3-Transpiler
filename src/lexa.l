@@ -55,14 +55,18 @@ literal {number}|{bool}|{char}|{string}
 "not"	return NOT;
 ":="	return ASSIGNEQ;
 
-{type}	return TYPE;
+{type}	{
+	char* yytextcpy = malloc(sizeof(yytext) + 1);
+	yylval.type = strcpy(yytextcpy, yytext);
+	return TYPE;
+}
 {ident}	{
-	char* yytextcpy = (char*) malloc(sizeof(yytext) + 1);
+	char* yytextcpy = malloc(sizeof(yytext) + 1);
 	yylval.ident = strcpy(yytextcpy, yytext);
 	return IDENT;
 };
 {literal}	{
-	char* yytextcpy = (char*) malloc(sizeof(yytext) + 1);
+	char* yytextcpy = malloc(sizeof(yytext) + 1);
 	yylval.literal = strcpy(yytextcpy, yytext);
 	return LITERAL;
 };
