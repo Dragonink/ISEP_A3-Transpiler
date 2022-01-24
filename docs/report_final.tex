@@ -1,0 +1,261 @@
+\documentclass[a4paper,12pt,notitlepage,english]{article}
+\usepackage[hmargin=1.5cm,vmargin=2cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[dvipsnames]{xcolor}
+\usepackage[main=english]{babel}
+\usepackage{mathtools}
+\usepackage{listings}
+\usepackage[pdfusetitle]{hyperref}
+
+\lstdefinelanguage{psblm}{
+  keywords={var,read,write,begin,end,if,then,else,while,do,function,return},
+  comment=[s]{\{}{\}},
+  string=[b]{"},
+  morestring=[b]{'},
+  sensitive=true,
+}
+\lstset{		
+	basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\bfseries\textcolor{Orchid},
+  commentstyle=\itshape\textcolor{gray},
+  stringstyle=\textcolor{Green},
+  tabsize=2,
+  breaklines=true,
+	postbreak=\mbox{\textcolor{red}{\(\hookrightarrow\)}\space},
+	keepspaces=true,
+  showstringspaces=false,
+  numbers=left,
+  numberstyle=\tiny,
+  numbersep=5pt,
+  stepnumber=1,
+}
+\renewcommand\lstlistingnamestyle{\bfseries}
+
+\title{\textbf{PSBLM} Transpiler}
+\author{\textsc{Berthoud} Tanguy \and \textsc{Liard} François \and \textsc{Msekni} Sabri}
+
+\begin{document}
+  \maketitle
+
+  This work contains the final version of our transpiler, which transpiles our pseudo-code \emph{PSBLM} language into Python.
+  The \emph{PSBLM} language grammar is described in \autoref{sec:grammar}.\\
+
+  \noindent The code is hosted in the GitHub repository \url{https://github.com/Dragonink/ISEP_A3-Transpiler}.
+
+  \tableofcontents\newpage
+
+  \section{Grammar}\label{sec:grammar}
+
+  In grammar rules, \emph{\bfseries bold italic} words are not reserved words, but literal characters: \begin{itemize}
+    \item \emph{\bfseries newline} is the \verb+LINE FEED+ character
+  \end{itemize}
+
+  Please note that the following grammar is the grammar we defined at the beginning of the project.
+  The implementation is equivalent but may not be exactly the same (see the \autoref{lst:syna.y}).
+
+  \subsection{Comments}
+
+  \(\verb+<comment>+ \longrightarrow \text{\bfseries \{} \left[\verb+^+\}\right]^* \text{\bfseries \}}\)
+
+  \subsection{Identifiers}
+
+  \(\verb+<letter>+ \longrightarrow \left[\text{A-Za-z}\right]\)\\
+  \(\verb+<digit>+ \longrightarrow \left[\text{0-9}\right]\)\\
+  \(\verb+<ident>+ \longrightarrow \verb+<letter>+ \left(\verb+<letter>+ | \verb+<digit>+ | \_\right)^*\)\\
+
+  \noindent Identifiers (\verb+<ident>+) cannot be reserved words (in \textbf{bold} in grammar rules).
+
+  \subsection{Variable declaration}
+
+  \(\verb+<type>+ \longrightarrow \text{\bfseries integer} | \text{\bfseries real} | \text{\bfseries boolean} | \text{\bfseries char} | \text{\bfseries string} \)\\
+  \(\verb+<declaration>+ \longrightarrow \text{\bfseries var } \verb+<ident>+\left(\text{\bfseries , } \verb+<ident>+\right)^*\text{\bfseries : } \verb+<type>+\)
+
+  \subsection{Expressions}
+
+  \(\verb+<number>+ \longrightarrow \verb+<digit>+^+\left(\text{\bfseries .}\verb+<digit>+^+\right)?\left(\text{\bfseries e}\left[\text{\bfseries +-}\right]?\verb+<digit>+^+\right)?\)\\
+  \(\verb+<bool>+ \longrightarrow \text{\bfseries true} | \text{\bfseries false}\)\\
+  \(\verb+<char>+ \longrightarrow \text{\bfseries '}\left[\verb+^+\text{'}\right]\text{\bfseries '}\)\\
+  \(\verb+<string>+ \longrightarrow \text{\bfseries "}[\verb+^+"]^*\text{\bfseries "}\)\\
+  \(\verb+<literal>+ \longrightarrow \verb+<number>+ | \verb+<bool>+ | \verb+<char>+ | \verb+<string>+\)\\
+  \(\verb+<unop>+ \longrightarrow \text{\bfseries +} | \text{\bfseries -} | \text{\bfseries not}\)\\
+  \(\verb+<biop>+ \longrightarrow \text{\bfseries +} | \text{\bfseries -} | \text{\bfseries *} | \text{\bfseries /} | \text{\bfseries div} | \text{\bfseries mod} | \text{\bfseries =} | \text{\bfseries <} | \text{\bfseries <=} | \text{\bfseries >} | \text{\bfseries >=} | \text{\bfseries <>} | \text{\bfseries and} | \text{\bfseries or}\)\\
+  \(\verb+<expr>+ \longrightarrow \verb+<comment>+\verb+<expr>+ | \verb+<expr>+\verb+<comment>+\\\indent | \text{\bfseries (}\verb+<expr>+\text{\bfseries )} | \verb+<unop>+\verb+<expr>+ | \verb+<expr>+\verb+<biop>+\verb+<expr>+ | \verb+<call>+ | \verb+<ident>+ | \verb+<literal>+\)
+
+  \subsection{Statements}
+
+  \(\verb+<assign>+ \longrightarrow \verb+<ident>+ \text{ \bfseries := } \verb+<expr>+\)\\
+  \(\verb+<read>+ \longrightarrow \text{\bfseries read(}\verb+<expr>+\text{\bfseries , }\verb+<ident>+\text{\bfseries )}\)\\
+  \(\verb+<write>+ \longrightarrow \text{\bfseries write(}\verb+<expr>+\text{\bfseries , }\verb+<expr>+\text{\bfseries )}\)\\
+  \(\verb+<return>+ \longrightarrow \text{\bfseries return }\verb+<expr>+\)\\
+  \(\verb+<stmt>+ \longrightarrow \verb+<comment>+ | \verb+<declaration>+ | \verb+<assign>+ | \verb+<read>+ | \verb+<write>+ | \verb+<return>+ | \verb+<if>+ | \verb+<while>+ | \verb+<block>+\)\\
+  \(\verb+<block>+ \longrightarrow \text{\bfseries begin \emph{newline}} \left(\verb+<stmt>+ \text{ \bfseries\emph{newline}}\right)^* \text{\bfseries end}\)\\
+  \(\verb+<if>+ \longrightarrow \text{\bfseries if } \verb+<expr>+ \text{ \bfseries then } \verb+<block>+ \left(\text{\bfseries else } \verb+<block>+\right)?\)\\
+  \(\verb+<while>+ \longrightarrow \text{\bfseries while } \verb+<expr>+ \text{ \bfseries do } \verb+<block>+\)
+
+  \subsection{Functions}
+
+  \(\verb+<fn>+ \longrightarrow \text{\bfseries function } \verb+<ident>+\text{\bfseries (}\left(\verb+<ident>+\left(\text{\bfseries , } \verb+<ident>+\right)^*\right)?\text{\bfseries )}\text{\bfseries : } \verb+<type>+ \verb+<block>+\)\\
+  \(\verb+<call>+ \longrightarrow \verb+<ident>+\text{\bfseries (}\left(\verb+<expr>+\left(\text{\bfseries , } \verb+<expr>+\right)^*\right)?\text{\bfseries )}\)
+
+  \subsection{Program structure}
+
+  \(\verb+<program>+ \longrightarrow ((\verb+<stmt>+ | \verb+<fn>+)\text{ \bfseries\emph{newline}})^*(\verb+<stmt>+ | \verb+<fn>+)?\)\\
+
+  \noindent\verb+<program>+ is the starting variable of our grammar.
+
+  \section{Standard functions}\label{sec:std}
+
+  Standard functions will be already declared identifiers.
+  These are:\begin{itemize}
+    \item \(|x|\) as \verb+abs(x)+
+    \item \(\exp(x)\) as \verb+exp(x)+
+    \item \(\log(x)\) as \verb+log(x)+
+    \item \(x^p\) as \verb+pow(x,p)+
+    \item \(\sqrt{x}\) as \verb+sqrt(x)+
+    \item \(\lfloor x \rfloor\) as \verb+floor(x)+
+    \item \(\lceil x \rceil\) as \verb+ceil(x)+
+  \end{itemize}
+
+  \section{Lexical analyser}\label{sec:lexa}
+
+  We are using \texttt{flex} as our lexical analyser generator.
+  Its role is just to recognise and pass the tokens to our syntax analyser (see \autoref{sec:syna}).
+
+  We are including \texttt{y.tab.h}, generated when compiling our syntax analyser, so our lexical analyser uses the exact values of the tokens known to our syntax analyser.
+  Moreover, it also passes the raw values of the \verb+<type>+, \verb+<ident>+ and \verb+<literal>+ variables using the special variable \texttt{yylval}.
+
+  The implementation listing is \autoref{lst:lexa.l}.
+
+  \section{Syntax analyser}\label{sec:syna}
+
+  We are using \texttt{bison} as our syntax analyser generator.
+  Its role is to recognise the input text against our grammar, using the tokens passed by our lexical analyser (see \autoref{sec:lexa}).
+
+  Alongside its recognition, we programmed it to manage symbol tables as well as a parse tree.
+  This tree will be used as an intermediate code representation to finally generate Python output.
+
+  The implementation listing is \autoref{lst:syna.y}.
+
+  \subsection{Symbol tables}
+
+  Our syntax analyser manages a main symbol table (\texttt{symtable} in the code), but can also manage scoped symbol tables.
+  To do that, it keeps track of the current scope using the \texttt{curr\_symtable} pointer.
+  When the scope ends, the \texttt{curr\_symtable} pointer is updated using the \texttt{parent} pointer of the current symbol table.
+
+  When the main symbol table is created, we manually add the standard functions (see \autoref{sec:std}) into it, so there will not be an `Undefined function' error when using them.
+
+  We have three functions to manage our symbol tables: \texttt{search\_sym}, \texttt{add\_sym} and \texttt{scoped\_symtable}.
+
+  \noindent\begin{minipage}{.3\linewidth}
+    The \texttt{search\_sym} function searches for an existing symbol with the name \texttt{name} in the table \texttt{table}.
+    If it cannot find it, it searches recursively in the parent table.
+  \end{minipage}\hspace{.05\linewidth}\begin{minipage}{.65\linewidth}
+    \lstinputlisting[linerange={324-336},firstnumber=324,language=C,nolol]{../src/syna.y}
+  \end{minipage}
+
+  \noindent\begin{minipage}{.3\linewidth}
+    The \texttt{add\_sym} function first calls \texttt{search\_sym} to check if the symbol exists.
+    If the symbol does not exist, it creates a new entry in the current table.
+  \end{minipage}\hspace{.05\linewidth}\begin{minipage}{.65\linewidth}
+    \lstinputlisting[linerange={337-350},firstnumber=337,language=C,nolol]{../src/syna.y}
+  \end{minipage}
+
+  \noindent\begin{minipage}{.3\linewidth}
+    The \texttt{scoped\_symtable} function creates a new symbol table and sets the current table as the parent of the newly-created one.
+  \end{minipage}\hspace{.05\linewidth}\begin{minipage}{.65\linewidth}
+    \lstinputlisting[linerange={351-355},firstnumber=351,language=C,nolol]{../src/syna.y}
+  \end{minipage}
+
+  \subsection{Parse tree}
+
+  Our syntax analyser manages a binary parse tree, in which each node has two pointers to their children.
+  The tree root is saved in \texttt{root}.
+
+  The main function to manage our parse tree is \texttt{new\_ast}.
+
+  \noindent\begin{minipage}{.3\linewidth}
+    Its role is only to allocate space for the node object, and set the type of the node (\texttt{token}) as well as its children.
+    Linking it correctly into the tree is the responsibility of the caller.
+  \end{minipage}\hspace{.05\linewidth}\begin{minipage}{.65\linewidth}
+    \lstinputlisting[linerange={357-363},firstnumber=357,language=C,nolol]{../src/syna.y}
+  \end{minipage}
+
+  \section{Code generation}
+
+  Finally after the syntax analyser returns the parse tree (see \autoref{sec:syna}), we pass this tree into our \texttt{transpile} function, which role is to output Python code.
+
+  It will recursively traverse the parse tree, and for each node generate a valid Python code, which will be appended to the output text.
+  Because of Python's indentation rules, we need to keep track of the current indentation level using the function's \texttt{indent\_lvl} parameter, which is increased or decreased along the blocks in the parse tree.
+
+  The implementation listing is \autoref{lst:ast.c}.
+
+  \section{Tests}
+
+  For each test, the source \emph{PSBLM} code is the listing on the left, and the output Python code is the listing on the right.
+
+  \subsection{Addition}
+
+  \noindent\begin{minipage}{.475\linewidth}
+    \lstinputlisting[language=psblm,nolol]{../tests/addition.psblm}
+  \end{minipage}\hspace{.05\linewidth}\begin{minipage}{.475\linewidth}
+    \lstinputlisting[language=Python,nolol]{../tests/addition.py}
+  \end{minipage}
+
+  \subsection{If}
+
+  \noindent\begin{minipage}{.475\linewidth}
+    \lstinputlisting[language=psblm,nolol]{../tests/if.psblm}
+  \end{minipage}\hspace{.05\linewidth}\begin{minipage}{.475\linewidth}
+    \lstinputlisting[language=Python,nolol]{../tests/if.py}
+  \end{minipage}
+
+  \subsection{While}
+
+  \noindent\begin{minipage}{.475\linewidth}
+    \lstinputlisting[language=psblm,nolol]{../tests/while.psblm}
+  \end{minipage}\hspace{.05\linewidth}\begin{minipage}{.475\linewidth}
+    \lstinputlisting[language=Python,nolol]{../tests/while.py}
+  \end{minipage}
+
+  \subsection{Function}
+
+  \noindent\begin{minipage}{.475\linewidth}
+    \lstinputlisting[language=psblm,nolol]{../tests/function.psblm}
+  \end{minipage}\hspace{.05\linewidth}\begin{minipage}{.475\linewidth}
+    \lstinputlisting[language=Python,nolol]{../tests/function.py}
+  \end{minipage}
+
+  \subsection{Function 2}
+
+  \noindent\begin{minipage}{.475\linewidth}
+    \lstinputlisting[language=psblm,nolol]{../tests/function2.psblm}
+  \end{minipage}\hspace{.05\linewidth}\begin{minipage}{.475\linewidth}
+    \lstinputlisting[language=Python,nolol]{../tests/function2.py}
+  \end{minipage}
+
+  \subsection{Standard function}
+
+  \noindent\begin{minipage}{.475\linewidth}
+    \lstinputlisting[language=psblm,nolol]{../tests/std.psblm}
+  \end{minipage}\hspace{.05\linewidth}\begin{minipage}{.475\linewidth}
+    \lstinputlisting[language=Python,nolol]{../tests/std.py}
+  \end{minipage}
+
+  \clearpage\pagenumbering{roman}\appendix
+  \part*\lstlistlistingname\addcontentsline{toc}{part}\lstlistlistingname%
+
+  \renewcommand\lstlistlistingname{}  
+  \vspace{-1cm}\lstlistoflistings\vspace{.5cm}
+
+  \lstinputlisting[caption={\ttfamily sym.h},label={lst:sym.h},language=C]{../src/sym.h}
+
+  \newpage\lstinputlisting[caption={\ttfamily ast.h},label={lst:ast.h},language=C]{../src/ast.h}
+
+  \newpage\lstinputlisting[caption={\ttfamily ast.c},label={lst:ast.c},language=C]{../src/ast.c}
+
+  \newpage\lstinputlisting[caption={\ttfamily lexa.l},label={lst:lexa.l}]{../src/lexa.l}
+
+  \newpage\lstinputlisting[caption={\ttfamily syna.y},label={lst:syna.y}]{../src/syna.y}
+\end{document}
